@@ -3,7 +3,10 @@ package com.achievo.hadoop.hdfs;
 import java.io.IOException;
 import java.net.URI;
 
+import org.apache.commons.io.IOUtils;
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.FSDataInputStream;
+import org.apache.hadoop.fs.FSDataOutputStream;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
@@ -68,6 +71,72 @@ public class HdfsDAO
 		}
 		System.out.println("==========================================================");
 		fs.close();
+	}
+
+	public void mkdirs(String folder) throws IOException
+	{
+		Path path = new Path(folder);
+		FileSystem fs = FileSystem.get(URI.create(hdfsPath), conf);
+		if (!fs.exists(path))
+		{
+			fs.mkdirs(path);
+			System.out.println("Create: " + folder);
+		}
+		fs.close();
+	}
+
+	public void rmr(String folder) throws IOException
+	{
+		Path path = new Path(folder);
+		FileSystem fs = FileSystem.get(URI.create(hdfsPath), conf);
+		fs.deleteOnExit(path);
+		System.out.println("Delete: " + folder);
+		fs.close();
+	}
+
+	public void createFile(String file, String content) throws IOException
+	{
+		FileSystem fs = FileSystem.get(URI.create(hdfsPath), conf);
+		byte[] buff = content.getBytes();
+		FSDataOutputStream os = null;
+		try
+		{
+			os = fs.create(new Path(file));
+			os.write(buff, 0, buff.length);
+			System.out.println("Create: " + file);
+		}
+		finally
+		{
+			if (os != null)
+				os.close();
+		}
+	}
+	
+	public void download(String local, String remote) throws IOException
+	{
+		Path path = new Path(remote);
+		FileSystem fs = FileSystem.get(URI.create(hdfsPath), conf);
+		fs.copyToLocalFile(path, new Path(local));
+		System.out.println("download: from " + remote + " to " + local);
+		fs.close();
+	}
+	
+	public void cat(String remoteFile) throws IOException
+	{
+		Path path = new Path(remoteFile);
+		FileSystem fs = FileSystem.get(URI.create(hdfsPath), conf);
+		FSDataInputStream fsdis = null;
+		try
+		{
+			fsdis = fs.open(path);
+			IOUtils.copy(fsdis, System.out); 
+		}
+		finally
+		{
+			if (fsdis != null)
+				fsdis.close();
+			fs.close();
+		}
 	}
 
 	public static void main(String[] args) throws IOException
