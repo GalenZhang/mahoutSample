@@ -111,7 +111,7 @@ public class HdfsDAO
 				os.close();
 		}
 	}
-	
+
 	public void download(String local, String remote) throws IOException
 	{
 		Path path = new Path(remote);
@@ -120,16 +120,18 @@ public class HdfsDAO
 		System.out.println("download: from " + remote + " to " + local);
 		fs.close();
 	}
-	
-	public void cat(String remoteFile) throws IOException
+
+	public String cat(String remoteFile) throws IOException
 	{
 		Path path = new Path(remoteFile);
 		FileSystem fs = FileSystem.get(URI.create(hdfsPath), conf);
 		FSDataInputStream fsdis = null;
+		String str = null;
+
 		try
 		{
 			fsdis = fs.open(path);
-			IOUtils.copy(fsdis, System.out); 
+			IOUtils.copy(fsdis, System.out);
 		}
 		finally
 		{
@@ -137,6 +139,9 @@ public class HdfsDAO
 				fsdis.close();
 			fs.close();
 		}
+
+		System.out.println(str);
+		return str;
 	}
 
 	public static void main(String[] args) throws IOException
