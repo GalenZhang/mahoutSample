@@ -147,7 +147,7 @@ public class WordCountTopology
 			String record = input.getString(0);
 			if (record != null && !record.trim().isEmpty())
 			{
-				for (String word : record.split("\\s"))
+				for (String word : record.split("\\s+"))
 				{
 					collector.emit(input, new Values(word, 1));
 					LOG.info("Emittied: word = " + word);
