@@ -70,11 +70,11 @@ public class MultiStreamsWordDistributionTopology
 
 		// configure 3 saver bolts
 		builder.setBolt("bolt-number-saver", new SaveDataBolt(Type.NUMBER), 3).shuffleGrouping("bolt-distributor",
-			"bolt-number-saver");
+			"stream-number-saver");
 		builder.setBolt("bolt-string-saver", new SaveDataBolt(Type.STRING), 3).shuffleGrouping("bolt-distributor",
-			"bolt-string-saver");
+			"stream-string-saver");
 		builder.setBolt("bolt-sign-saver", new SaveDataBolt(Type.SIGN), 3).shuffleGrouping("bolt-distributor",
-			"bolt-sign-saver");
+			"stream-sign-saver");
 
 		// submit topology
 		Config conf = new Config();
@@ -91,6 +91,7 @@ public class MultiStreamsWordDistributionTopology
 			LocalCluster cluster = new LocalCluster();
 			cluster.submitTopology(name, conf, builder.createTopology());
 			Thread.sleep(60 * 1000);
+			cluster.killTopology(name);
 			cluster.shutdown();
 		}
 	}

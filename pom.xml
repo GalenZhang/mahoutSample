@@ -207,7 +207,17 @@
 			<version>0.9.5</version>
 		</dependency>
 
-
+		<dependency>
+			<groupId>org.apache.storm</groupId>
+			<artifactId>storm-kafka</artifactId>
+			<version>0.9.5</version>
+		</dependency>
+		
+		<dependency>
+			<groupId>org.apache.storm</groupId>
+			<artifactId>storm-hdfs</artifactId>
+			<version>0.9.5</version>
+		</dependency>
 
 		<dependency>
 			<groupId>junit</groupId>
