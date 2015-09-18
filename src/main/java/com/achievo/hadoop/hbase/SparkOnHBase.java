@@ -71,7 +71,7 @@ public class SparkOnHBase
 		Put p = new Put(Bytes.toBytes(tuple._1()));
 		p.addColumn(Bytes.toBytes("basic"), Bytes.toBytes("name"), Bytes.toBytes(tuple._2()));
 		p.addColumn(Bytes.toBytes("basic"), Bytes.toBytes("age"), Bytes.toBytes(tuple._3()));
-		return new Tuple2<ImmutableBytesWritable, Put>(new ImmutableBytesWritable(), p);
+		return new Tuple2<ImmutableBytesWritable, Put>(new ImmutableBytesWritable(Bytes.toBytes(tuple._1())), p);
 	}
 
 	public static void main(String[] args) throws IOException
