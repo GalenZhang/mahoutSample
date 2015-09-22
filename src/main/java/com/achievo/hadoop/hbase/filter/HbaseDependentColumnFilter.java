@@ -5,6 +5,8 @@ import java.util.ArrayList;
 import java.util.List;
 
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.hbase.Cell;
+import org.apache.hadoop.hbase.CellUtil;
 import org.apache.hadoop.hbase.HBaseConfiguration;
 import org.apache.hadoop.hbase.HColumnDescriptor;
 import org.apache.hadoop.hbase.HTableDescriptor;
@@ -19,9 +21,8 @@ import org.apache.hadoop.hbase.client.Scan;
 import org.apache.hadoop.hbase.client.Table;
 import org.apache.hadoop.hbase.filter.BinaryComparator;
 import org.apache.hadoop.hbase.filter.CompareFilter.CompareOp;
+import org.apache.hadoop.hbase.filter.DependentColumnFilter;
 import org.apache.hadoop.hbase.filter.Filter;
-import org.apache.hadoop.hbase.filter.QualifierFilter;
-import org.apache.hadoop.hbase.filter.SubstringComparator;
 import org.apache.hadoop.hbase.util.Bytes;
 import org.junit.After;
 import org.junit.Before;
@@ -48,7 +49,7 @@ import org.junit.Test;
  * 
  * </pre>
  */
-public class HbaseQualifierFilter
+public class HbaseDependentColumnFilter
 {
 	private Configuration conf;
 
@@ -115,25 +116,18 @@ public class HbaseQualifierFilter
 	{
 		List<Put> list = new ArrayList<Put>();
 		Put put1 = new Put(("row1").getBytes());
-		put1.addColumn(columnFamily1.getBytes(), "title".getBytes(), "title".getBytes());
-		put1.addColumn(columnFamily1.getBytes(), "content".getBytes(), "content".getBytes());
-		put1.addColumn(columnFamily2.getBytes(), "user".getBytes(), "user".getBytes());
-		put1.addColumn(columnFamily2.getBytes(), "time".getBytes(), "time".getBytes());
+		put1.addColumn(columnFamily1.getBytes(), "title".getBytes(), "hadoop".getBytes());
+		put1.addColumn(columnFamily1.getBytes(), "content".getBytes(), "hadoop is easy".getBytes());
 		list.add(put1);
 
 		Put put2 = new Put(("row2").getBytes());
-		put2.addColumn(columnFamily1.getBytes(), "thumbUrl".getBytes(), "title".getBytes());
-		put2.addColumn(columnFamily1.getBytes(), "author".getBytes(), "content".getBytes());
-		put2.addColumn(columnFamily2.getBytes(), "age".getBytes(), "user".getBytes());
+		put2.addColumn(columnFamily1.getBytes(), "content".getBytes(), "hbase is hard".getBytes());
 		list.add(put2);
 
 		Put put3 = new Put(("row3").getBytes());
-		put3.addColumn(columnFamily1.getBytes(), "title".getBytes(), "title".getBytes());
-		put3.addColumn(columnFamily1.getBytes(), "author".getBytes(), "content".getBytes());
-		put3.addColumn(columnFamily2.getBytes(), "age".getBytes(), "user".getBytes());
-		put3.addColumn(columnFamily2.getBytes(), "time".getBytes(), "time".getBytes());
+		put3.addColumn(columnFamily1.getBytes(), "title".getBytes(), "hive".getBytes());
+		put3.addColumn(columnFamily1.getBytes(), "content".getBytes(), "what's hive".getBytes());
 		list.add(put3);
-
 		table.put(list);
 		System.out.println("data add success!");
 	}
@@ -144,25 +138,36 @@ public class HbaseQualifierFilter
 	 * @throws IOException
 	 */
 	@Test
-	public void filterQualifier() throws IOException
+	public void filterValue() throws IOException
 	{
 		Scan scan = new Scan();
-		// 创建一个列过滤器 列名等于thumbUrl 应该打印出row2
-		Filter filter1 = new QualifierFilter(CompareOp.EQUAL, new BinaryComparator(Bytes.toBytes("thumbUrl")));
+		// 如果第三个参数是true则返回值中没有该列的值, 如果是false则有
+		// 所以这里会返回所有有title列的值 但是不会返回title值
+		Filter filter1 = new DependentColumnFilter(columnFamily1.getBytes(), "title".getBytes(), true);
 		scan.setFilter(filter1);
 		ResultScanner rs1 = table.getScanner(scan);
 		for (Result result : rs1)
 		{
-			System.out.println("filter1:" + result);
+			for (Cell cell : result.rawCells())
+			{
+				System.out.println("filter1:" + Bytes.toString(CellUtil.cloneQualifier(cell)) + " : "
+						+ Bytes.toString(CellUtil.cloneValue(cell)));
+			}
 		}
 		rs1.close();
 
-		Filter filter2 = new QualifierFilter(CompareOp.EQUAL, new SubstringComparator("a"));
+		// 这里会返回有title列并且title列值等于hive的数据 并且会返回title值
+		Filter filter2 = new DependentColumnFilter(columnFamily1.getBytes(), "title".getBytes(), false,
+				CompareOp.EQUAL, new BinaryComparator("hard".getBytes()));
 		scan.setFilter(filter2);
 		ResultScanner rs2 = table.getScanner(scan);
 		for (Result result : rs2)
 		{
-			System.out.println("filter2:" + result);
+			for (Cell cell : result.rawCells())
+			{
+				System.out.println("filter2:" + Bytes.toString(CellUtil.cloneQualifier(cell)) + " : "
+						+ Bytes.toString(CellUtil.cloneValue(cell)));
+			}
 		}
 		rs2.close();
 	}

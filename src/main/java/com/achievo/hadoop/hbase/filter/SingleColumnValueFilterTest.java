@@ -5,6 +5,8 @@ import java.util.ArrayList;
 import java.util.List;
 
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.hbase.Cell;
+import org.apache.hadoop.hbase.CellUtil;
 import org.apache.hadoop.hbase.HBaseConfiguration;
 import org.apache.hadoop.hbase.HColumnDescriptor;
 import org.apache.hadoop.hbase.HTableDescriptor;
@@ -17,11 +19,10 @@ import org.apache.hadoop.hbase.client.Result;
 import org.apache.hadoop.hbase.client.ResultScanner;
 import org.apache.hadoop.hbase.client.Scan;
 import org.apache.hadoop.hbase.client.Table;
-import org.apache.hadoop.hbase.filter.BinaryComparator;
 import org.apache.hadoop.hbase.filter.CompareFilter.CompareOp;
 import org.apache.hadoop.hbase.filter.Filter;
-import org.apache.hadoop.hbase.filter.QualifierFilter;
-import org.apache.hadoop.hbase.filter.SubstringComparator;
+import org.apache.hadoop.hbase.filter.RegexStringComparator;
+import org.apache.hadoop.hbase.filter.SingleColumnValueFilter;
 import org.apache.hadoop.hbase.util.Bytes;
 import org.junit.After;
 import org.junit.Before;
@@ -48,7 +49,7 @@ import org.junit.Test;
  * 
  * </pre>
  */
-public class HbaseQualifierFilter
+public class SingleColumnValueFilterTest
 {
 	private Configuration conf;
 
@@ -115,25 +116,25 @@ public class HbaseQualifierFilter
 	{
 		List<Put> list = new ArrayList<Put>();
 		Put put1 = new Put(("row1").getBytes());
-		put1.addColumn(columnFamily1.getBytes(), "title".getBytes(), "title".getBytes());
-		put1.addColumn(columnFamily1.getBytes(), "content".getBytes(), "content".getBytes());
-		put1.addColumn(columnFamily2.getBytes(), "user".getBytes(), "user".getBytes());
-		put1.addColumn(columnFamily2.getBytes(), "time".getBytes(), "time".getBytes());
+		put1.addColumn(columnFamily1.getBytes(), "title".getBytes(), "hadoop".getBytes());
+		put1.addColumn(columnFamily1.getBytes(), "content".getBytes(), "hadoop is easy".getBytes());
+		put1.addColumn(columnFamily2.getBytes(), "user".getBytes(), "admin".getBytes());
+		put1.addColumn(columnFamily2.getBytes(), "time".getBytes(), "20150901".getBytes());
 		list.add(put1);
 
 		Put put2 = new Put(("row2").getBytes());
-		put2.addColumn(columnFamily1.getBytes(), "thumbUrl".getBytes(), "title".getBytes());
-		put2.addColumn(columnFamily1.getBytes(), "author".getBytes(), "content".getBytes());
-		put2.addColumn(columnFamily2.getBytes(), "age".getBytes(), "user".getBytes());
+		put2.addColumn(columnFamily1.getBytes(), "title".getBytes(), "hbase".getBytes());
+		put2.addColumn(columnFamily1.getBytes(), "content".getBytes(), "hbase is hard".getBytes());
+		put2.addColumn(columnFamily2.getBytes(), "user".getBytes(), "ljt".getBytes());
+		put2.addColumn(columnFamily2.getBytes(), "time".getBytes(), "20150902".getBytes());
 		list.add(put2);
 
 		Put put3 = new Put(("row3").getBytes());
-		put3.addColumn(columnFamily1.getBytes(), "title".getBytes(), "title".getBytes());
-		put3.addColumn(columnFamily1.getBytes(), "author".getBytes(), "content".getBytes());
-		put3.addColumn(columnFamily2.getBytes(), "age".getBytes(), "user".getBytes());
-		put3.addColumn(columnFamily2.getBytes(), "time".getBytes(), "time".getBytes());
+		put3.addColumn(columnFamily1.getBytes(), "title".getBytes(), "hive".getBytes());
+		put3.addColumn(columnFamily1.getBytes(), "content".getBytes(), "what's hive".getBytes());
+		put3.addColumn(columnFamily2.getBytes(), "user".getBytes(), "ljt".getBytes());
+		put3.addColumn(columnFamily2.getBytes(), "time".getBytes(), "20150903".getBytes());
 		list.add(put3);
-
 		table.put(list);
 		System.out.println("data add success!");
 	}
@@ -144,25 +145,36 @@ public class HbaseQualifierFilter
 	 * @throws IOException
 	 */
 	@Test
-	public void filterQualifier() throws IOException
+	public void filterValue() throws IOException
 	{
 		Scan scan = new Scan();
-		// 创建一个列过滤器 列名等于thumbUrl 应该打印出row2
-		Filter filter1 = new QualifierFilter(CompareOp.EQUAL, new BinaryComparator(Bytes.toBytes("thumbUrl")));
+		// 创建一个单列值过滤器 找到title列值等于hive行的数据
+		Filter filter1 = new SingleColumnValueFilter(columnFamily1.getBytes(), "title".getBytes(), CompareOp.EQUAL,
+				Bytes.toBytes("hive"));
 		scan.setFilter(filter1);
 		ResultScanner rs1 = table.getScanner(scan);
 		for (Result result : rs1)
 		{
-			System.out.println("filter1:" + result);
+			for (Cell cell : result.rawCells())
+			{
+				System.out.println("filter1:" + Bytes.toString(CellUtil.cloneQualifier(cell)) + " : "
+						+ Bytes.toString(CellUtil.cloneValue(cell)));
+			}
 		}
 		rs1.close();
 
-		Filter filter2 = new QualifierFilter(CompareOp.EQUAL, new SubstringComparator("a"));
+		// 创建一个单列值过滤器 找到content列值包含is行的数据
+		Filter filter2 = new SingleColumnValueFilter(columnFamily1.getBytes(), "content".getBytes(), CompareOp.EQUAL,
+				new RegexStringComparator("is"));
 		scan.setFilter(filter2);
 		ResultScanner rs2 = table.getScanner(scan);
 		for (Result result : rs2)
 		{
-			System.out.println("filter2:" + result);
+			for (Cell cell : result.rawCells())
+			{
+				System.out.println("filter2:" + Bytes.toString(CellUtil.cloneQualifier(cell)) + " : "
+						+ Bytes.toString(CellUtil.cloneValue(cell)));
+			}
 		}
 		rs2.close();
 	}
