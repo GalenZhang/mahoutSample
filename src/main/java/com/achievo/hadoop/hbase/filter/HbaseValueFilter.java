@@ -5,6 +5,8 @@ import java.util.ArrayList;
 import java.util.List;
 
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.hbase.Cell;
+import org.apache.hadoop.hbase.CellUtil;
 import org.apache.hadoop.hbase.HBaseConfiguration;
 import org.apache.hadoop.hbase.HColumnDescriptor;
 import org.apache.hadoop.hbase.HTableDescriptor;
@@ -12,7 +14,6 @@ import org.apache.hadoop.hbase.TableName;
 import org.apache.hadoop.hbase.client.Admin;
 import org.apache.hadoop.hbase.client.Connection;
 import org.apache.hadoop.hbase.client.ConnectionFactory;
-import org.apache.hadoop.hbase.client.Get;
 import org.apache.hadoop.hbase.client.Put;
 import org.apache.hadoop.hbase.client.Result;
 import org.apache.hadoop.hbase.client.ResultScanner;
@@ -20,8 +21,9 @@ import org.apache.hadoop.hbase.client.Scan;
 import org.apache.hadoop.hbase.client.Table;
 import org.apache.hadoop.hbase.filter.BinaryComparator;
 import org.apache.hadoop.hbase.filter.CompareFilter.CompareOp;
-import org.apache.hadoop.hbase.filter.FamilyFilter;
 import org.apache.hadoop.hbase.filter.Filter;
+import org.apache.hadoop.hbase.filter.RegexStringComparator;
+import org.apache.hadoop.hbase.filter.ValueFilter;
 import org.apache.hadoop.hbase.util.Bytes;
 import org.junit.After;
 import org.junit.Before;
@@ -48,7 +50,7 @@ import org.junit.Test;
  * 
  * </pre>
  */
-public class HbaseFamilyFilter
+public class HbaseValueFilter
 {
 	private Configuration conf;
 
@@ -98,11 +100,8 @@ public class HbaseFamilyFilter
 			else
 			{
 				HTableDescriptor desc = new HTableDescriptor(tn);
-				for (int i = 0; i < 3; i++)
-				{
-					desc.addFamily(new HColumnDescriptor(columnFamily1 + i));
-					desc.addFamily(new HColumnDescriptor(columnFamily2 + i));
-				}
+				desc.addFamily(new HColumnDescriptor(columnFamily1));
+				desc.addFamily(new HColumnDescriptor(columnFamily2));
 				admin.createTable(desc);
 				System.out.println("create " + tableName + " success !");
 				addData();
@@ -117,19 +116,26 @@ public class HbaseFamilyFilter
 	public void addData() throws IOException
 	{
 		List<Put> list = new ArrayList<Put>();
-		for (int i = 0; i < 5; i++)
-		{
-			Put put = new Put(("row" + i).getBytes());
-			for (int j = 0; j < 3; j++)
-			{
-				put.addColumn((columnFamily1 + j).getBytes(), "title".getBytes(), ("title" + i).getBytes());
-				put.addColumn((columnFamily1 + j).getBytes(), "content".getBytes(), ("content" + i).getBytes());
-				put.addColumn((columnFamily2 + j).getBytes(), "user".getBytes(), ("user" + i).getBytes());
-				put.addColumn((columnFamily2 + j).getBytes(), "time".getBytes(), ("time" + i).getBytes());
-			}
+		Put put1 = new Put(("row1").getBytes());
+		put1.addColumn(columnFamily1.getBytes(), "title".getBytes(), "hadoop".getBytes());
+		put1.addColumn(columnFamily1.getBytes(), "content".getBytes(), "hadoop is easy".getBytes());
+		put1.addColumn(columnFamily2.getBytes(), "user".getBytes(), "admin".getBytes());
+		put1.addColumn(columnFamily2.getBytes(), "time".getBytes(), "20150901".getBytes());
+		list.add(put1);
 
-			list.add(put);
-		}
+		Put put2 = new Put(("row2").getBytes());
+		put2.addColumn(columnFamily1.getBytes(), "title".getBytes(), "hbase".getBytes());
+		put2.addColumn(columnFamily1.getBytes(), "content".getBytes(), "hbase is hard".getBytes());
+		put2.addColumn(columnFamily2.getBytes(), "user".getBytes(), "ljt".getBytes());
+		put2.addColumn(columnFamily2.getBytes(), "time".getBytes(), "20150902".getBytes());
+		list.add(put2);
+
+		Put put3 = new Put(("row3").getBytes());
+		put3.addColumn(columnFamily1.getBytes(), "title".getBytes(), "hive".getBytes());
+		put3.addColumn(columnFamily1.getBytes(), "content".getBytes(), "what's hive".getBytes());
+		put3.addColumn(columnFamily2.getBytes(), "user".getBytes(), "ljt".getBytes());
+		put3.addColumn(columnFamily2.getBytes(), "time".getBytes(), "20150903".getBytes());
+		list.add(put3);
 		table.put(list);
 		System.out.println("data add success!");
 	}
@@ -140,31 +146,35 @@ public class HbaseFamilyFilter
 	 * @throws IOException
 	 */
 	@Test
-	public void filterColumnFamily() throws IOException
+	public void filterValue() throws IOException
 	{
 		Scan scan = new Scan();
-		// 创建一个列族过滤器 列族名等于info1
-		Filter filter1 = new FamilyFilter(CompareOp.EQUAL, new BinaryComparator(Bytes.toBytes("info1")));
+		// 创建一个行键过滤器 指定比较操作符小于或等于 比较器使用二进制直接比较器
+		Filter filter1 = new ValueFilter(CompareOp.EQUAL, new BinaryComparator(Bytes.toBytes("hive")));
 		scan.setFilter(filter1);
 		ResultScanner rs1 = table.getScanner(scan);
 		for (Result result : rs1)
 		{
-			System.out.println("filter1:" + result);
+			for (Cell cell : result.rawCells())
+			{
+				System.out.println("filter1:" + Bytes.toString(CellUtil.cloneQualifier(cell)) + " : "
+						+ Bytes.toString(CellUtil.cloneValue(cell)));
+			}
 		}
 		rs1.close();
 
-		Get get1 = new Get(Bytes.toBytes("row3"));
-		Filter filter2 = new FamilyFilter(CompareOp.EQUAL, new BinaryComparator(Bytes.toBytes("comment2")));
-		get1.setFilter(filter2);
-		Result result = table.get(get1);
-		System.out.println("get1: " + result);
-
-		Get get2 = new Get(Bytes.toBytes("row3"));
-		get2.addFamily(Bytes.toBytes("comment1"));
-		Filter filter3 = new FamilyFilter(CompareOp.EQUAL, new BinaryComparator(Bytes.toBytes("info2")));
-		get2.setFilter(filter3);
-		Result result2 = table.get(get2);
-		System.out.println("get2: " + result2);
+		Filter filter2 = new ValueFilter(CompareOp.EQUAL, new RegexStringComparator("hard"));
+		scan.setFilter(filter2);
+		ResultScanner rs2 = table.getScanner(scan);
+		for (Result result : rs2)
+		{
+			for (Cell cell : result.rawCells())
+			{
+				System.out.println("filter2:" + Bytes.toString(CellUtil.cloneQualifier(cell)) + " : "
+						+ Bytes.toString(CellUtil.cloneValue(cell)));
+			}
+		}
+		rs2.close();
 	}
 
 	@After
