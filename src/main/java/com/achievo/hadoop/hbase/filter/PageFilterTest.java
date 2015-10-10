@@ -5,8 +5,6 @@ import java.util.ArrayList;
 import java.util.List;
 
 import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.hbase.Cell;
-import org.apache.hadoop.hbase.CellUtil;
 import org.apache.hadoop.hbase.HBaseConfiguration;
 import org.apache.hadoop.hbase.HColumnDescriptor;
 import org.apache.hadoop.hbase.HTableDescriptor;
@@ -19,10 +17,8 @@ import org.apache.hadoop.hbase.client.Result;
 import org.apache.hadoop.hbase.client.ResultScanner;
 import org.apache.hadoop.hbase.client.Scan;
 import org.apache.hadoop.hbase.client.Table;
-import org.apache.hadoop.hbase.filter.BinaryComparator;
-import org.apache.hadoop.hbase.filter.CompareFilter.CompareOp;
-import org.apache.hadoop.hbase.filter.DependentColumnFilter;
 import org.apache.hadoop.hbase.filter.Filter;
+import org.apache.hadoop.hbase.filter.PageFilter;
 import org.apache.hadoop.hbase.util.Bytes;
 import org.junit.After;
 import org.junit.Before;
@@ -49,7 +45,7 @@ import org.junit.Test;
  * 
  * </pre>
  */
-public class HbaseDependentColumnFilter
+public class PageFilterTest
 {
 	private Configuration conf;
 
@@ -115,19 +111,16 @@ public class HbaseDependentColumnFilter
 	public void addData() throws IOException
 	{
 		List<Put> list = new ArrayList<Put>();
-		Put put1 = new Put(("row1").getBytes());
-		put1.addColumn(columnFamily1.getBytes(), "title".getBytes(), "hadoop".getBytes());
-		put1.addColumn(columnFamily1.getBytes(), "content".getBytes(), "hadoop is easy".getBytes());
-		list.add(put1);
+		for (int i = 0; i < 20; i++)
+		{
+			Put put = new Put(("row" + i).getBytes());
+			put.addColumn(columnFamily1.getBytes(), "title".getBytes(), "hadoop".getBytes());
+			put.addColumn(columnFamily1.getBytes(), "content".getBytes(), "hadoop is easy".getBytes());
+			put.addColumn(columnFamily2.getBytes(), "user".getBytes(), "admin".getBytes());
+			put.addColumn(columnFamily2.getBytes(), "time".getBytes(), "20150901".getBytes());
+			list.add(put);
+		}
 
-		Put put2 = new Put(("row2").getBytes());
-		put2.addColumn(columnFamily1.getBytes(), "content".getBytes(), "hbase is hard".getBytes());
-		list.add(put2);
-
-		Put put3 = new Put(("row3").getBytes());
-		put3.addColumn(columnFamily1.getBytes(), "title".getBytes(), "hive".getBytes());
-		put3.addColumn(columnFamily1.getBytes(), "content".getBytes(), "what's hive".getBytes());
-		list.add(put3);
 		table.put(list);
 		System.out.println("data add success!");
 	}
@@ -140,36 +133,45 @@ public class HbaseDependentColumnFilter
 	@Test
 	public void filterValue() throws IOException
 	{
-		Scan scan = new Scan();
-		// 如果第三个参数是true则返回值中没有该列的值, 如果是false则有
-		// 所以这里会返回所有有title列的值 但是不会返回title值
-		Filter filter1 = new DependentColumnFilter(columnFamily1.getBytes(), "title".getBytes(), true);
-		scan.setFilter(filter1);
-		ResultScanner rs1 = table.getScanner(scan);
-		for (Result result : rs1)
+		// 每页返回5行
+		Filter filter = new PageFilter(5);
+		final byte[] POSTFIX = new byte[] {0x00};
+		byte[] lastRow = null;
+		int totalRows = 0;
+		int index = 0;
+		while (true)
 		{
-			for (Cell cell : result.rawCells())
-			{
-				System.out.println("filter1:" + Bytes.toString(CellUtil.cloneQualifier(cell)) + " : "
-						+ Bytes.toString(CellUtil.cloneValue(cell)));
-			}
-		}
-		rs1.close();
+			Scan scan = new Scan();
+			scan.setFilter(filter);
 
-		// 这里会返回有title列并且title列值等于hive的数据 并且会返回title值
-		Filter filter2 = new DependentColumnFilter(columnFamily1.getBytes(), "title".getBytes(), false,
-				CompareOp.EQUAL, new BinaryComparator("hive".getBytes()));
-		scan.setFilter(filter2);
-		ResultScanner rs2 = table.getScanner(scan);
-		for (Result result : rs2)
-		{
-			for (Cell cell : result.rawCells())
+			if (lastRow != null)
 			{
-				System.out.println("filter2:" + Bytes.toString(CellUtil.cloneQualifier(cell)) + " : "
-						+ Bytes.toString(CellUtil.cloneValue(cell)));
+				byte[] startRow = Bytes.add(lastRow, POSTFIX);
+				scan.setStartRow(startRow);
+			}
+
+			ResultScanner rs = table.getScanner(scan);
+			boolean flag = false;
+			index++;
+			for (Result result : rs)
+			{
+				lastRow = result.getRow();
+				if (lastRow != null && lastRow.length > 0)
+				{
+					flag = true;
+					totalRows++;
+					System.out.println("第" + index + "次遍历结果：" + result);
+				}
+			}
+			rs.close();
+
+			if (!flag)
+			{
+				System.out.println("总共：" + totalRows + "行,遍历：" + (index - 1) + "次");
+				break;
 			}
 		}
-		rs2.close();
+
 	}
 
 	@After

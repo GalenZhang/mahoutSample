@@ -5,8 +5,6 @@ import java.util.ArrayList;
 import java.util.List;
 
 import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.hbase.Cell;
-import org.apache.hadoop.hbase.CellUtil;
 import org.apache.hadoop.hbase.HBaseConfiguration;
 import org.apache.hadoop.hbase.HColumnDescriptor;
 import org.apache.hadoop.hbase.HTableDescriptor;
@@ -19,10 +17,8 @@ import org.apache.hadoop.hbase.client.Result;
 import org.apache.hadoop.hbase.client.ResultScanner;
 import org.apache.hadoop.hbase.client.Scan;
 import org.apache.hadoop.hbase.client.Table;
-import org.apache.hadoop.hbase.filter.BinaryComparator;
-import org.apache.hadoop.hbase.filter.CompareFilter.CompareOp;
-import org.apache.hadoop.hbase.filter.DependentColumnFilter;
 import org.apache.hadoop.hbase.filter.Filter;
+import org.apache.hadoop.hbase.filter.PrefixFilter;
 import org.apache.hadoop.hbase.util.Bytes;
 import org.junit.After;
 import org.junit.Before;
@@ -49,7 +45,7 @@ import org.junit.Test;
  * 
  * </pre>
  */
-public class HbaseDependentColumnFilter
+public class PrefixFilterTest
 {
 	private Configuration conf;
 
@@ -118,15 +114,22 @@ public class HbaseDependentColumnFilter
 		Put put1 = new Put(("row1").getBytes());
 		put1.addColumn(columnFamily1.getBytes(), "title".getBytes(), "hadoop".getBytes());
 		put1.addColumn(columnFamily1.getBytes(), "content".getBytes(), "hadoop is easy".getBytes());
+		put1.addColumn(columnFamily2.getBytes(), "user".getBytes(), "admin".getBytes());
+		put1.addColumn(columnFamily2.getBytes(), "time".getBytes(), "20150901".getBytes());
 		list.add(put1);
 
 		Put put2 = new Put(("row2").getBytes());
+		put2.addColumn(columnFamily1.getBytes(), "title".getBytes(), "hbase".getBytes());
 		put2.addColumn(columnFamily1.getBytes(), "content".getBytes(), "hbase is hard".getBytes());
+		put2.addColumn(columnFamily2.getBytes(), "user".getBytes(), "ljt".getBytes());
+		put2.addColumn(columnFamily2.getBytes(), "time".getBytes(), "20150902".getBytes());
 		list.add(put2);
 
 		Put put3 = new Put(("row3").getBytes());
 		put3.addColumn(columnFamily1.getBytes(), "title".getBytes(), "hive".getBytes());
 		put3.addColumn(columnFamily1.getBytes(), "content".getBytes(), "what's hive".getBytes());
+		put3.addColumn(columnFamily2.getBytes(), "user".getBytes(), "ljt".getBytes());
+		put3.addColumn(columnFamily2.getBytes(), "time".getBytes(), "20150903".getBytes());
 		list.add(put3);
 		table.put(list);
 		System.out.println("data add success!");
@@ -141,35 +144,16 @@ public class HbaseDependentColumnFilter
 	public void filterValue() throws IOException
 	{
 		Scan scan = new Scan();
-		// 如果第三个参数是true则返回值中没有该列的值, 如果是false则有
-		// 所以这里会返回所有有title列的值 但是不会返回title值
-		Filter filter1 = new DependentColumnFilter(columnFamily1.getBytes(), "title".getBytes(), true);
+		// 查找rowkey前缀是row1的所有行
+		Filter filter1 = new PrefixFilter(Bytes.toBytes("row1"));
 		scan.setFilter(filter1);
 		ResultScanner rs1 = table.getScanner(scan);
 		for (Result result : rs1)
 		{
-			for (Cell cell : result.rawCells())
-			{
-				System.out.println("filter1:" + Bytes.toString(CellUtil.cloneQualifier(cell)) + " : "
-						+ Bytes.toString(CellUtil.cloneValue(cell)));
-			}
+			System.out.println(result);
 		}
 		rs1.close();
 
-		// 这里会返回有title列并且title列值等于hive的数据 并且会返回title值
-		Filter filter2 = new DependentColumnFilter(columnFamily1.getBytes(), "title".getBytes(), false,
-				CompareOp.EQUAL, new BinaryComparator("hive".getBytes()));
-		scan.setFilter(filter2);
-		ResultScanner rs2 = table.getScanner(scan);
-		for (Result result : rs2)
-		{
-			for (Cell cell : result.rawCells())
-			{
-				System.out.println("filter2:" + Bytes.toString(CellUtil.cloneQualifier(cell)) + " : "
-						+ Bytes.toString(CellUtil.cloneValue(cell)));
-			}
-		}
-		rs2.close();
 	}
 
 	@After
