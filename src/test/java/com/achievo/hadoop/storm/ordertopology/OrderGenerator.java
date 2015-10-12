@@ -78,7 +78,7 @@ public class OrderGenerator
 
 	private void popTuple()
 	{
-		String content = jedis.rpop("order");
+		String content = jedis.rpop("orders");
 		JSONObject obj = (JSONObject) JSONValue.parse(content);
 		String id = obj.get(FieldNames.ID).toString();
 		JSONArray items = (JSONArray) obj.get(FieldNames.ITEMS);
