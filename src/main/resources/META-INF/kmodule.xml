@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<kmodule xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xmlns="http://jboss.org/kie/6.0.0/kmodule">
+    <kbase name="HelloWorldKB" packages="com.achievo.jbpm.drools">
+        <ksession name="HelloWorldKS"/>
+    </kbase>
+    
+    <kbase name="LogRulesKB" packages="com.achievo.hadoop.storm.logtopology.bolt">
+        <ksession name="LogRulesKS"/>
+    </kbase>
+</kmodule>
