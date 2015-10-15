@@ -72,7 +72,7 @@ public class VolumeCountingBolt extends BaseRichBolt
 		collector.emit(new Values(getMinuteForTime(entry.getTimestamp()), entry.getSource(), 1L));
 	}
 
-	private Object getMinuteForTime(Date timestamp)
+	public static long getMinuteForTime(Date timestamp)
 	{
 		Calendar c = Calendar.getInstance();
 		c.setTime(timestamp);

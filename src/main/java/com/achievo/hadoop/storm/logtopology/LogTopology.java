@@ -39,10 +39,15 @@ import com.hmsonline.storm.cassandra.bolt.CassandraCounterBatchingBolt;
  */
 public class LogTopology
 {
+	private TopologyBuilder builder = new TopologyBuilder();
+
+	private Config conf = new Config();
+
+	private LocalCluster cluster = new LocalCluster();
+
 	@SuppressWarnings("rawtypes")
-	public static void main(String[] args) throws AlreadyAliveException, InvalidTopologyException
+	public LogTopology()
 	{
-		TopologyBuilder builder = new TopologyBuilder();
 		builder.setSpout("logSpout", new LogSpout(), 10);
 		builder.setBolt("logRules", new LogRulesBolt(), 10).shuffleGrouping("logSpout");
 		builder.setBolt("indexer", new IndexerBolt(), 10).shuffleGrouping("logRules");
@@ -51,16 +56,62 @@ public class LogTopology
 				Conf.COUNT_CF_NAME, VolumeCountingBolt.FIELD_ROW_KEY, VolumeCountingBolt.FIELD_INCREMENT);
 		builder.setBolt("countPersistor", logPersistenceBolt, 10).shuffleGrouping("counter");
 
-		Config conf = new Config();
 		conf.put(Conf.REDIS_PORT_KEY, Conf.DEFAULT_JEDIS_PORT);
 		conf.put(StormCassandraConstants.CASSANDRA_KEYSPACE, Conf.LOGGING_KEYSPACE);
+	}
 
+	public TopologyBuilder getBuilder()
+	{
+		return builder;
+	}
+
+	public LocalCluster getLocalCluster()
+	{
+		return cluster;
+	}
+
+	public Config getConf()
+	{
+		return conf;
+	}
+
+	public void runLocal(int runTime)
+	{
+		conf.setDebug(true);
+		conf.put(Conf.REDIS_HOST_KEY, "localhost");
+		conf.put(StormCassandraConstants.CASSANDRA_HOST, "localhost:9171");
+		cluster.submitTopology("test", conf, builder.createTopology());
+		if (runTime > 0)
+		{
+			Utils.sleep(runTime);
+			shutDownLocal();
+		}
+	}
+
+	public void shutDownLocal()
+	{
+		if (cluster != null)
+		{
+			cluster.killTopology("test");
+			cluster.shutdown();
+		}
+	}
+
+	public void runCluster(String name, String redisHost, String cassandraHost) throws AlreadyAliveException,
+			InvalidTopologyException
+	{
+		conf.setNumWorkers(20);
+		conf.put(Conf.REDIS_HOST_KEY, redisHost);
+		conf.put(StormCassandraConstants.CASSANDRA_HOST, cassandraHost);
+		StormSubmitter.submitTopology(name, conf, builder.createTopology());
+	}
+
+	public static void main(String[] args) throws AlreadyAliveException, InvalidTopologyException
+	{
+		LogTopology topology = new LogTopology();
 		if (args != null && args.length > 1)
 		{
-			conf.setNumWorkers(20);
-			conf.put(Conf.REDIS_HOST_KEY, args[1]);
-			conf.put(StormCassandraConstants.CASSANDRA_HOST, args[2]);
-			StormSubmitter.submitTopology(args[0], conf, builder.createTopology());
+			topology.runCluster(args[0], args[1], args[2]);
 		}
 		else
 		{
@@ -68,15 +119,7 @@ public class LogTopology
 			{
 				System.out.println("Running in local mode, redis ip missing for cluster run");
 			}
-
-			LocalCluster cluster = new LocalCluster();
-			conf.setDebug(true);
-			conf.put(Conf.REDIS_HOST_KEY, "localhost");
-			conf.put(StormCassandraConstants.CASSANDRA_HOST, "localhost:9171");
-			cluster.submitTopology("test", conf, builder.createTopology());
-			Utils.sleep(10000);
-			cluster.killTopology("test");
-			cluster.shutdown();
+			topology.runLocal(10000);
 		}
 	}
 }
