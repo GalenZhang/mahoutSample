@@ -1,0 +1,8 @@
+package com.achievo.protobuf.examples;
+message helloworld
+{
+	required int32 id = 1;
+	required string str = 2;
+	optional int32 opt = 3;
+}
+// protoc --java_out=../../../../../java *
