@@ -24,7 +24,7 @@
 					<groupId>jdk.tools</groupId>
 					<artifactId>jdk.tools</artifactId>
 				</exclusion>
-			</exclusions>	
+			</exclusions>
 		</dependency>
 
 		<dependency>
@@ -201,6 +201,12 @@
 					<artifactId>jmxri</artifactId>
 				</exclusion>
 			</exclusions>
+		</dependency>
+
+		<dependency>
+			<groupId>com.101tec</groupId>
+			<artifactId>zkclient</artifactId>
+			<version>0.7</version>
 		</dependency>
 
 		<dependency>
